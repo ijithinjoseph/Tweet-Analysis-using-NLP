@@ -1,0 +1,347 @@
+import numpy as np 
+import pandas as pd 
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
+import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from PIL import Image
+from wordcloud import WordCloud, STOPWORDS , ImageColorGenerator
+df=pd.read_csv("trumptweets.csv")
+df.head()
+df.dropna(inplace=True)
+from datetime import date
+df['date']=pd.to_datetime(df['date'])
+#====
+L = ['year', 'month', 'day', 'dayofweek', 'dayofyear', 'weekofyear', 'quarter']
+df = df.join(pd.concat((getattr(df['date'].dt, i).rename(i) for i in L), axis=1))
+df['year'].value_counts()
+df['hash'] = df['tweet'].apply(lambda word:word.count('#'))
+df['men'] = df['tweet'].apply(lambda word:word.count('@'))
+df['tweet_length_ch']=df['tweet'].apply(lambda x:len(x))
+df=df.loc[df['tweet_length_ch']<=280]
+#=== 
+df['tweet_length']=df['tweet_length_ch'].apply(lambda x:'short' if x <=130 else 'long')
+df['med'] = df['tweet'].apply(lambda word:word.count('https://t.co/'))
+df['med'].unique()
+df_copy=df.copy()
+df_copy2=df.copy()
+
+# EDA
+# Check tweets length
+sns.boxplot(df['tweet_length_ch'])
+plt.figure(figsize=(14,5))
+iris = df_copy['tweet_length_ch']
+sns.kdeplot(data=iris)
+insult_tw=df_copy.groupby('tweet',as_index=False).agg({'insult':'count'})
+insult_tw.describe()
+insult_tw_75 = insult_tw.loc[insult_tw['insult']==16]
+print('Most tweet have insulted Targets is : ', insult_tw_75.values)
+df_media=df_copy.loc[df_copy['target']=='the-media']
+print('Most insult word with The Media was : ',df_media['insult'].value_counts()[:1])
+#==============
+tweet_All = " ".join(insul for insul in df_media.insult)
+fig, ax = plt.subplots(1, 1, figsize  = (12,10))
+wordcloud_ALL = WordCloud(max_font_size=50, max_words=100,colormap="inferno", background_color="white").generate(tweet_All)
+ax.imshow(wordcloud_ALL, interpolation='bilinear')
+ax.axis('off');
+df_bide=df_copy.loc[df_copy['target']=='joe-biden']
+print('Most insult word with joe biden was : ',df_bide['insult'].value_counts()[:1])
+#==============
+tweet_All = " ".join(insul for insul in df_bide.insult)
+fig, ax = plt.subplots(1, 1, figsize  = (12,10))
+wordcloud_ALL = WordCloud(max_font_size=50, max_words=100,colormap='gray', background_color="white").generate(tweet_All)
+ax.imshow(wordcloud_ALL, interpolation='bilinear')
+ax.axis('off');
+df_hc=df_copy.loc[df_copy['target']=='hillary-clinton']
+print('Most insult word with hillary-clinton was : ',df_hc['insult'].value_counts()[:1])
+#==============
+tweet_All = " ".join(insul for insul in df_hc.insult)
+fig, ax = plt.subplots(1, 1, figsize  = (12,10))
+wordcloud_ALL = WordCloud(max_font_size=50, max_words=100,colormap="Blues", background_color="skyblue").generate(tweet_All)
+ax.imshow(wordcloud_ALL, interpolation='bilinear')
+ax.axis('off');
+df_trump_russia =df_copy.loc[df_copy['target']=='trump-russia']
+print('Most insult word with df_trump_russia was : ',df_trump_russia['insult'].value_counts()[:1])
+#==============
+tweet_All = " ".join(insul for insul in df_trump_russia.insult)
+fig, ax = plt.subplots(1, 1, figsize  = (12,10))
+wordcloud_ALL = WordCloud(max_font_size=50,colormap="Reds", max_words=100, background_color="white").generate(tweet_All)
+ax.imshow(wordcloud_ALL, interpolation='bilinear')
+ax.axis('off');
+
+# Data Visualization (EDA)
+# Pie Chart of Tweet Length
+plt.figure(figsize=(10,7))
+labels = 'Long', 'Short'
+sizes = [8748,1610]
+explode = (0.1, 0)  
+plt.figure(figsize=(10,5))
+plt.pie(sizes, explode=explode, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90);
+plt.axis('equal');  
+
+# Mention in Tweets
+plt.figure(figsize=(14,7))
+sns.countplot(data=df,x='tweet_length',hue='men').set_title('Mention / Tweet Length');
+
+# Media in Tweets
+plt.figure(figsize=(14,7))
+No_Media= len(df[df['med']==0])
+Media = len(df[df['med']>0])
+Platform = ['NoMedia','Media']
+Count = [No_Media,Media]
+#====
+fig = px.pie(names = Platform, values = Count, title='Media/No Media', color_discrete_sequence = px.colors.sequential.Agsunset)
+fig.update_traces(textposition='inside', textinfo='percent+label')
+
+# 3D Leangth_Hashtag_Mentions
+d3 = df_copy[['tweet_length_ch','men','hash','tweet_length']]
+hashtag=df_copy['hash'].values
+mention=df_copy['men'].values
+length=df_copy['tweet_length_ch'].values
+L= df_copy['tweet_length'].values
+trace = go.Scatter3d(x=hashtag,y=mention,z=length,mode='markers',marker=dict(size=5,color="crimson"))
+fig=go.Figure(data=[trace])
+fig.show()
+
+# Top 10 targets
+r_op =df['target'].value_counts()
+r_op = r_op[:10]
+sns.set_style("darkgrid")
+plt.figure(figsize=(20,6));
+r_op_vis = sns.barplot(x = r_op.index, y =  r_op.values, alpha =0.8, palette="inferno");
+plt.title('Trump Targets',fontsize=15);
+plt.ylabel('insults', fontsize=12);
+plt.xlabel('Target', fontsize=12);
+r_op_vis.set_xticklabels(rotation=30,labels=r_op.index,fontsize=15);
+plt.show();
+
+# Most insult appears
+tweet_All = " ".join(insul for insul in df.insult)
+fig, ax = plt.subplots(1, 1, figsize  = (10,10))
+wordcloud_ALL = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(tweet_All)
+ax.imshow(wordcloud_ALL, interpolation='bilinear')
+ax.axis('off')
+
+dftime = df.groupby('year', as_index = False).agg({'insult':'count'}).reset_index()
+px.line(x=dftime['year'], y=dftime['insult'], title='insult by year')
+
+dftime_dw = df.groupby('dayofweek',as_index=False).agg({'insult':'count'}).reset_index()
+px.line(x=dftime_dw['dayofweek'],y=dftime_dw['insult'],title='insult by Daysofweek')
+
+dftime_q = df.groupby('quarter',as_index=False).agg({'insult':'count'}).reset_index()
+px.line(x=dftime_q['quarter'],y=dftime_q['insult'],title='insult by quarter')
+
+tweets = df['tweet'].drop_duplicates()
+all_sentences = []
+
+for word in tweets:
+    all_sentences.append(word)
+
+all_sentences
+lines = list()
+for line in all_sentences:    
+    words = line.split()
+    for w in words: 
+       lines.append(w)
+
+# Removing Punctuation
+import re
+lines = [re.sub(r'[^A-Za-z0-9]+', '', x) for x in lines]
+lines
+lines2 = []
+for word in lines:
+    if word != '':
+        lines2.append(word)
+
+# Getting words roots
+from nltk.stem.snowball import SnowballStemmer
+s_stemmer = SnowballStemmer(language='english')
+stem = []
+for word in lines2:
+    stem.append(s_stemmer.stem(word))
+
+import spacy.cli
+spacy.cli.download("en_core_web_lg")
+
+import spacy
+nlp = spacy.load('en_core_web_lg')
+
+stem2 = []
+for word in stem:
+    if word not in nlp.Defaults.stop_words:
+        stem2.append(word)
+
+df = pd.DataFrame(stem2)
+df = df[0].value_counts()
+
+df = df[:20,]
+#== 
+px.bar(df, x=df.values,y= df.index, color=df.index, height=500)
+
+import spacy.cli
+spacy.cli.download("en_core_web_sm")
+
+# Top mention Organizations
+import spacy
+from spacy import displacy
+from collections import Counter
+import en_core_web_sm
+nlp = en_core_web_sm.load()
+#====== 
+def show_ents(doc):
+    if doc.ents:
+        for ent in doc.ents:
+            print(ent.text + ' - ' + ent.label_ + ' - ' + str(spacy.explain(ent.label_)))
+#======
+nlp = spacy.load('en_core_web_sm') 
+nlp.max_length = 2000000000000
+#=====
+str1 = " " 
+stem2 = str1.join(lines2)
+stem2 = nlp(stem2)
+label = [(X.text, X.label_) for X in stem2.ents]
+df6 = pd.DataFrame(label, columns = ['Word','Entity'])
+df7 = df6.where(df6['Entity'] == 'ORG')
+df7 = df7['Word'].value_counts()
+
+df = df7[:20,]
+plt.figure(figsize=(10,5))
+px.bar(df, x=df.values,y= df.index, color=df.index, height=500)
+
+# Top mention People
+nlp = spacy.load('en_core_web_sm') 
+nlp.max_length = 2000000000000
+str1 = " " 
+stem2 = str1.join(lines2)
+stem2 = nlp(stem2)
+label = [(X.text, X.label_) for X in stem2.ents]
+df10 = pd.DataFrame(label, columns = ['Word','Entity'])
+df10 = df10.where(df10['Entity'] == 'PERSON')
+df11 = df10['Word'].value_counts()
+
+df = df11[:20,]
+plt.figure(figsize=(10,5))
+df = df11[:20,]
+plt.figure(figsize=(10,5))
+px.bar(df, x=df.values,y= df.index, color=df.index, height=500)
+
+# Sentiment Analysis
+# Removing characters
+features=tweets.values
+#=== 
+processed_features = []
+for sentence in range(0, len(features)):
+    # Remove all the Http: urls
+    processed_feature = re.sub('(https?://\S+)', '', str(features[sentence]))
+    
+    # Remove all the special characters
+    processed_feature = re.sub(r'\W', ' ', processed_feature)
+
+    # Remove all single characters
+    processed_feature= re.sub(r'\s+[a-zA-Z]\s+', ' ', processed_feature)
+
+    # Remove single characters from the start
+    processed_feature = re.sub(r'\^[a-zA-Z]\s+', ' ', processed_feature) 
+
+    # Substituting multiple spaces with single space
+    processed_feature = re.sub(r'\s+', ' ', processed_feature, flags=re.I)
+
+    # Removing prefixed 'b'
+    processed_feature = re.sub(r'^b\s+', '', processed_feature)
+
+    # Converting to Lowercase
+    processed_feature = processed_feature.lower()
+    processed_features.append(processed_feature)
+
+# Adding subjectivity & Popularity
+df3=pd.DataFrame()
+df3['Tweets']=processed_features
+#=======
+from textblob import TextBlob
+from wordcloud import WordCloud
+# Create a function to get the subjectivity
+def getSubjectivity(text):
+   return TextBlob(text).sentiment.subjectivity
+# Create a function to get the polarity
+def getPolarity(text):
+   return  TextBlob(text).sentiment.polarity
+# Create two new columns 'Subjectivity' & 'Polarity'
+df3['Subjectivity'] = df3['Tweets'].apply(getSubjectivity)
+df3['Polarity'] = df3['Tweets'].apply(getPolarity)
+
+
+# Sentiment Analysis
+#Create a function to compute negative (-1), neutral (0) and positive (+1) analysis
+def getAnalysis(score):
+ if score < 0:
+  return 'Negative'
+ elif score == 0:
+  return 'Neutral'
+ else:
+  return 'Positive'
+df3['Analysis'] = df3['Polarity'].apply(getAnalysis)
+df3
+
+
+Neutral = len(df3[df3['Analysis']=='Neutral'])
+Negative = len(df3[df3['Analysis']=='Negative'])
+Positive = len(df3[df3['Analysis']=='Positive'])
+labels = ['Negative','Positive','Neutral']
+values = [Negative,Positive,Neutral]
+#====
+import plotly.graph_objects as go
+colors = ['red','green', 'lightblue' ]
+fig = go.Figure(data=[go.Pie(labels=labels, values=values)])
+fig.update_traces(hoverinfo='label+percent', textinfo='percent', textfont_size=20,textposition='inside', marker=dict(colors=colors, line=dict(color='grey', width=1)))
+fig.show()
+
+# Sentiments by Time
+df_copy['tweet']=df_copy['tweet'].drop_duplicates(inplace=True)
+df3['year']=df_copy['year']
+#=== 
+df_copy['sentiment']=df3['Analysis']
+df_tim_sen = df_copy[['year','sentiment']]
+df_copy['year'].value_counts()
+#=== 
+df_time_sen =pd.get_dummies(df_tim_sen).groupby('year').sum().reset_index()
+df_time_sen =df_time_sen.sort_values('year',ascending=True)
+#=======
+plt.style.use('seaborn-whitegrid')
+plt.figure(figsize=(14,7))
+plt.plot(df_time_sen['year'] ,df_time_sen['sentiment_Negative'],marker='o',label='Negative') 
+plt.plot(df_time_sen['year'] , df_time_sen['sentiment_Neutral'],color='blue',marker='*',label='Neutral')  
+plt.plot(df_time_sen['year'] ,df_time_sen['sentiment_Positive'],color='green',marker='+',label='Positive') 
+#=== 
+plt.annotate('High Negative insult tweets', xy=(2018, 850),  xycoords='data', xytext=(0.8, 0.95), textcoords='axes fraction', arrowprops=dict(facecolor='black', shrink=0.10), horizontalalignment='center', verticalalignment='top')
+
+
+
+# Tweets length in Sentiments
+df_copy2.drop_duplicates(subset=['tweet'])
+df3['insult']=df_copy2['insult']
+df3['target']=df_copy2['target']
+df3['med']=df_copy2['med']
+df3['tweet_length']=df_copy2['tweet_length']
+#==== 
+plt.figure(figsize=(14,5))
+sns.countplot(x='Analysis',data=df3,hue='tweet_length',palette="inferno")
+
+
+# Media in Sentiments
+plt.figure(figsize=(14,5))
+sns.countplot(x='Analysis',data=df3,hue='med',palette="Oranges")
+
+
+# ADVANCED ANIMATED TARGET CARDS
+# Shows Top Targets in Trump insult Tweets and how Trump insult them
+from IPython.display import display, HTML
+from IPython.display import IFrame
+HTML('''<div class="flourish-embed flourish-cards"<script src="https://public.flourish.studio/resources/embed.js"></script></div>''')
+IFrame(src='https://www.nbcnews.com/politics/2020-election/everything-trump-has-said-about-2020-field-insults-all-n998556', width=1000, height = 700)
+
